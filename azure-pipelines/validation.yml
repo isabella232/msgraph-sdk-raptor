@@ -23,20 +23,6 @@ resources:
      endpoint: microsoftgraph
      name: microsoftgraph/microsoft-graph-explorer-api
      ref: dev
-   - repository: MSGraph-SDK-Code-Generator
-     type: github
-     endpoint: microsoftgraph
-     name: microsoftgraph/MSGraph-SDK-Code-Generator
-     ref: master
-   - repository: msgraph-sdk-dotnet
-     type: github
-     endpoint: microsoftgraph
-     name: microsoftgraph/msgraph-sdk-dotnet
-     ref: dev
-   - repository: msgraph-metadata
-     type: github
-     endpoint: microsoftgraph
-     name: microsoftgraph/msgraph-metadata
 
 pool:
   vmImage: 'windows-latest'
@@ -44,14 +30,8 @@ pool:
 variables:
   buildConfiguration: 'Release'
   apidoctorPath: 'apidoctor'
-  generatorPath: 'MSGraph-SDK-Code-Generator'
-  typewriterSolution: '$(generatorPath)/**/Typewriter.sln'
   apidoctorSolution: '$(apidoctorPath)/**/*.sln'
-  snippetLanguages: 'C#' #'C#,JavaScript,Objective-C,Java'
-  metadataVersion: 'v1.0'
-  metadataURL: 'https://graph.microsoft.com/stagingv1.0/`$metadata'
-  runSettingsFile: '$(Build.SourcesDirectory)/msgraph-sdk-raptor/CSharpArbitraryDllTests/Test.runsettings'
-  runKnownFailureTests: false
+  snippetLanguages: 'C#,JavaScript,Objective-C,Java'
 
 steps:
 - checkout: microsoft-graph-explorer-api
@@ -68,27 +48,6 @@ steps:
   displayName: checkout apidoctor
   fetchDepth: 1
   submodules: recursive
-  persistCredentials: true
-  
-- checkout: msgraph-metadata
-  displayName: checkout metadata
-  fetchDepth: 1
-  persistCredentials: true
-
-- checkout: MSGraph-SDK-Code-Generator
-  displayName: checkout generator
-  fetchDepth: 1
-  submodules: recursive
-  persistCredentials: true
-
-- checkout: msgraph-sdk-dotnet
-  displayName: checkout dotnet
-  fetchDepth: 1
-  persistCredentials: true
-
-- checkout: self
-  displayName: checkout raptor
-  fetchDepth: 1
   persistCredentials: true
 
 - task: DotNetCoreCLI@2
@@ -127,111 +86,3 @@ steps:
       Write-Host "Path to apidoctor tool: $apidoctorPath"
 
       & $apidoctorPath generate-snippets --ignore-warnings --path . --snippet-generator-path $snippetGeneratorPath --lang $(snippetLanguages) --git-path "C:\Program Files\Git\bin\git.exe" --skip-publishing-changes
-
-- task: NuGetCommand@2
-  displayName: 'Restore packages for Typewriter tool'
-  inputs:
-    restoreSolution: '$(typewriterSolution)'
-
-- task: VSBuild@1
-  displayName: 'Build Typewriter'
-  inputs:
-    solution: '$(typewriterSolution)'
-    platform: 'Any CPU'
-    configuration: '$(buildConfiguration)'
-
-# TODO support metadata path
-- task: PowerShell@2
-  displayName: 'Transform metadata, run Typewriter and update models'
-  inputs:
-    targetType: 'inline'
-    script: |
-      $outputPath = Join-Path $env:Build_SourcesDirectory "output"
-      Write-Host "Path to typewriter.exe output $outputPath"
-
-      $typewriterPath = (Join-Path (Join-Path $env:Build_SourcesDirectory\MSGraph-SDK-Code-Generator\src\Typewriter\bin\ $(buildConfiguration)) Typewriter.exe)
-      Write-Host "Path to typewriter tool: $typewriterPath"
-
-      $metadataDir = "metadata"
-      mkdir $metadataDir
-      $metadataFile = Join-Path $metadataDir "metadata.xml"
-      Invoke-WebRequest -Uri $(metadataURL) -OutFile $metadataFile
-      Write-Host "Downloaded $(metadataURL) to $metadataFile" -ForegroundColor Green
-
-      $xslTranformScriptPath = "$env:Build_SourcesDirectory\msgraph-metadata\transforms\csdl\transform.ps1"
-      $xslPath = "msgraph-metadata\transforms\csdl\preprocess_csdl.xsl"
-      $cleanMetadataFile = Join-Path $metadataDir "clean_metadata.xml"
-
-      # transform script uses relative path to working directory
-      & $xslTranformScriptPath -xslPath $xslPath -inputPath $metadataFile -outputPath $cleanMetadataFile
-      Write-Host "Transformed $metadataFile to $cleanMetadataFile" -ForegroundColor Green
-
-      Write-Host "Running Typewriter..."
-      & $typewriterPath -v Info -m $cleanMetadataFile -o $outputPath -g Files
-
-      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-sdk-dotnet\src\Microsoft.Graph\Generated\"
-      Write-Host "Path to repo model directory: $repoModelsDir"
-
-      Remove-Item -Recurse $repoModelsDir | Write-Host
-      Write-Host "Removed the existing generated files in the repo." -ForegroundColor Green
-
-      $modelsDirectory = Join-Path $outputPath "\com\microsoft\graph\"
-      Move-Item $modelsDirectory $repoModelsDir
-      Write-Host "Moved the models from $modelsDirectory into the local repo." -ForegroundColor Green
-
-- task: DotNetCoreCLI@2
-  displayName: 'Build Microsoft.Graph.dll'
-  inputs:
-    command: 'build'
-    projects: msgraph-sdk-dotnet/**/*.csproj
-    arguments: '--configuration $(buildConfiguration)'
-
-- task: PowerShell@2
-  displayName: 'Transform .runsettings file for passing tests'
-  inputs:
-    targetType: inline
-    workingDirectory: '$(Build.SourcesDirectory)'
-    script: |
-      $dllPath = (Get-ChildItem ./msgraph-sdk-dotnet/ -Include Microsoft.Graph.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
-      Write-Host "Path to Microsoft.Graph.dll: $dllPath"
-
-      & .\msgraph-sdk-raptor\CSharpArbitraryDllTests\transformSettings.ps1 -Version "$(metadataVersion)" -KnownFailuresRequested "false" -DllPath "$dllPath" -RunSettingsPath "$(runSettingsFile)"
-
-      Write-Host "--- Test.runsettings file ---"
-      Get-Content "$(runSettingsFile)"
-      Write-Host "-----------------------------"
-
-- task: DotNetCoreCLI@2
-  displayName: 'Csharp Compilation Tests'
-  inputs:
-    command: 'test'
-    projects: '**/CSharpArbitraryDllTests.csproj'
-    arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --settings $(runSettingsFile)'
-    publishTestResults: false
-  continueOnError: true
-
-- task: PowerShell@2
-  condition: eq(variables['runKnownFailureTests'], true)
-  displayName: 'Transform .runsettings file for known failures'
-  inputs:
-    targetType: inline
-    workingDirectory: '$(Build.SourcesDirectory)'
-    script: |
-      $dllPath = (Get-ChildItem ./msgraph-sdk-dotnet/ -Include Microsoft.Graph.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
-      Write-Host "Path to Microsoft.Graph.dll: $dllPath"
-
-      & .\msgraph-sdk-raptor\CSharpArbitraryDllTests\transformSettings.ps1 -Version "$(metadataVersion)" -KnownFailuresRequested "true" -DllPath "$dllPath" -RunSettingsPath "$(runSettingsFile)"
-
-      Write-Host "--- Test.runsettings file ---"
-      Get-Content "$(runSettingsFile)"
-      Write-Host "-----------------------------"
-
-- task: DotNetCoreCLI@2
-  condition: eq(variables['runKnownFailureTests'], true)
-  displayName: 'Csharp Compilation Tests for Known Failures'
-  inputs:
-    command: 'test'
-    projects: '**/CSharpArbitraryDllTests.csproj'
-    arguments: '--configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory) --settings $(runSettingsFile)'
-    publishTestResults: false
-  continueOnError: true
