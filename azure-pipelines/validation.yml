@@ -94,7 +94,7 @@ steps:
       Write-Host "Running Typewriter..."
       & $typewriterPath -v Info -m $cleanMetadataFile -o $outputPath -g Files
 
-      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-sdk-beta-dotnet\src\Microsoft.Graph.Beta\Generated\"
+      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-sdk-beta-dotnet\src\Microsoft.Graph\Generated\"
       Write-Host "Path to repo model directory: $repoModelsDir"
 
       Remove-Item -Recurse $repoModelsDir | Write-Host
@@ -118,7 +118,7 @@ steps:
     targetType: inline
     workingDirectory: '$(Build.SourcesDirectory)'
     script: |
-      $dllPath = (Get-ChildItem ./msgraph-beta-sdk-dotnet/ -Include Microsoft.Graph.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
+      $dllPath = (Get-ChildItem ./msgraph-beta-sdk-dotnet/ -Include Microsoft.Graph.Beta.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
       Write-Host "Path to Microsoft.Graph.Beta.dll: $dllPath"
       cp $dllPath $(Build.ArtifactStagingDirectory)\Microsoft.Graph.Beta.dll
 
