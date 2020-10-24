@@ -118,12 +118,23 @@ steps:
     targetType: inline
     workingDirectory: '$(Build.SourcesDirectory)'
     script: |
-      $dllPath = (Get-ChildItem ./msgraph-sdk-dotnet/ -Include Microsoft.Graph.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
+      $allGeneratedDlls = Get-ChildItem $dir -Include Microsoft.Graph.dll -Recurse
+      $dotNetFrameworkDll = $allGeneratedDlls | Where-Object { !$_.FullName.Contains("obj") -and !$_.FullName.Contains("netstandard") }
+      $dllPath = $dotNetFrameworkDll.FullName
       Write-Host "Path to Microsoft.Graph.dll: $dllPath"
-      cp $dllPath $(Build.ArtifactStagingDirectory)\Microsoft.Graph.dll
+      Write-Host "##vso[task.setvariable variable=dllPath]$dllPath"
+
+- task: PowerShell@2
+  displayName: 'Generate type summary'
+  inputs:
+    targetType: filePath
+    filePath: '$(Build.SourcesDirectory)/msgraph-sdk-dotnet/scripts/generateTypeSummary.ps1'
+    arguments: '-dllPath $(dllPath) -outputPath $(Build.ArtifactStagingDirectory)\Microsoft.Graph.txt'
+    workingDirectory: '$(Build.SourcesDirectory)' # Set the root for a multi-repo pipeline. /s
+  enabled: true
 
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)\Microsoft.Graph.dll'
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)\Microsoft.Graph.txt'
     ArtifactName: 'dll'
     publishLocation: 'Container'
