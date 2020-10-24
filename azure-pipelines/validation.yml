@@ -13,10 +13,10 @@ resources:
      endpoint: microsoftgraph
      name: microsoftgraph/MSGraph-SDK-Code-Generator
      ref: master
-   - repository: msgraph-sdk-dotnet
+   - repository: msgraph-beta-sdk-dotnet
      type: github
      endpoint: microsoftgraph
-     name: microsoftgraph/msgraph-sdk-dotnet
+     name: microsoftgraph/msgraph-beta-sdk-dotnet
      ref: dev
    - repository: msgraph-metadata
      type: github
@@ -45,7 +45,7 @@ steps:
   submodules: recursive
   persistCredentials: true
 
-- checkout: msgraph-sdk-dotnet
+- checkout: msgraph-beta-sdk-dotnet
   displayName: checkout dotnet
   fetchDepth: 1
   persistCredentials: true
@@ -94,7 +94,7 @@ steps:
       Write-Host "Running Typewriter..."
       & $typewriterPath -v Info -m $cleanMetadataFile -o $outputPath -g Files
 
-      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-sdk-dotnet\src\Microsoft.Graph\Generated\"
+      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-sdk-beta-dotnet\src\Microsoft.Graph.Beta\Generated\"
       Write-Host "Path to repo model directory: $repoModelsDir"
 
       Remove-Item -Recurse $repoModelsDir | Write-Host
@@ -105,10 +105,10 @@ steps:
       Write-Host "Moved the models from $modelsDirectory into the local repo." -ForegroundColor Green
 
 - task: DotNetCoreCLI@2
-  displayName: 'Build Microsoft.Graph.dll'
+  displayName: 'Build Microsoft.Graph.Beta.dll'
   inputs:
     command: 'build'
-    projects: msgraph-sdk-dotnet/**/*.csproj
+    projects: msgraph-beta-sdk-dotnet/**/*.csproj
     arguments: '--configuration $(buildConfiguration)'
 
 
@@ -118,12 +118,12 @@ steps:
     targetType: inline
     workingDirectory: '$(Build.SourcesDirectory)'
     script: |
-      $dllPath = (Get-ChildItem ./msgraph-sdk-dotnet/ -Include Microsoft.Graph.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
-      Write-Host "Path to Microsoft.Graph.dll: $dllPath"
-      cp $dllPath $(Build.ArtifactStagingDirectory)\Microsoft.Graph.dll
+      $dllPath = (Get-ChildItem ./msgraph-beta-sdk-dotnet/ -Include Microsoft.Graph.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
+      Write-Host "Path to Microsoft.Graph.Beta.dll: $dllPath"
+      cp $dllPath $(Build.ArtifactStagingDirectory)\Microsoft.Graph.Beta.dll
 
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)\Microsoft.Graph.dll'
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)\Microsoft.Graph.Beta.dll'
     ArtifactName: 'dll'
     publishLocation: 'Container'
