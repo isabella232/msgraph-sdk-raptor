@@ -17,7 +17,7 @@ resources:
      type: github
      endpoint: microsoftgraph
      name: microsoftgraph/msgraph-beta-sdk-dotnet
-     ref: dev
+     ref: master
    - repository: msgraph-metadata
      type: github
      endpoint: microsoftgraph
