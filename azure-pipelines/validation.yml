@@ -94,7 +94,7 @@ steps:
       Write-Host "Running Typewriter..."
       & $typewriterPath -v Info -m $cleanMetadataFile -o $outputPath -g Files
 
-      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-sdk-beta-dotnet\src\Microsoft.Graph\Generated\"
+      $repoModelsDir = "$env:Build_SourcesDirectory\msgraph-beta-sdk-dotnet\src\Microsoft.Graph\Generated\"
       Write-Host "Path to repo model directory: $repoModelsDir"
 
       Remove-Item -Recurse $repoModelsDir | Write-Host
