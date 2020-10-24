@@ -118,7 +118,9 @@ steps:
     targetType: inline
     workingDirectory: '$(Build.SourcesDirectory)'
     script: |
-      $dllPath = (Get-ChildItem ./msgraph-beta-sdk-dotnet/ -Include Microsoft.Graph.Beta.dll -Recurse | Where-Object { $_.FullName.Contains("netcoreapp") }).FullName
+      $allGeneratedDlls = Get-ChildItem $dir -Include Microsoft.Graph.Beta.dll -Recurse
+      $dotNetFrameworkDll = $allGeneratedDlls | Where-Object { !$_.FullName.Contains("obj") -and !$_.FullName.Contains("netstandard") }
+      $dllPath = $dotNetFrameworkDll.FullName
       Write-Host "Path to Microsoft.Graph.Beta.dll: $dllPath"
       Write-Host "##vso[task.setvariable variable=dllPath]$dllPath"
 
