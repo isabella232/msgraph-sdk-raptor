@@ -4,13 +4,18 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.Graph;
+using Microsoft.Graph.Auth;
+using Microsoft.Identity.Client;
 using MsGraphSDKSnippetsCompiler.Models;
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Runtime.Loader;
 using System.Threading.Tasks;
 
 namespace MsGraphSDKSnippetsCompiler
@@ -32,7 +37,7 @@ namespace MsGraphSDKSnippetsCompiler
         /// </summary>
         /// <param name="codeSnippet">The code snippet to be compiled.</param>
         /// <returns>CompilationResultsModel</returns>
-        public CompilationResultsModel CompileSnippet(string codeSnippet, Versions version)
+        public CompilationResultsModel RunSnippet(string codeSnippet, Versions version)
         {
             SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(codeSnippet);
 
@@ -53,6 +58,7 @@ namespace MsGraphSDKSnippetsCompiler
                 MetadataReference.CreateFromFile(Path.Combine(Path.GetDirectoryName(typeof(JToken).Assembly.Location), "Newtonsoft.Json.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(Path.GetDirectoryName(typeof(HttpClient).Assembly.Location), "System.Net.Http.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(Path.GetDirectoryName(typeof(Expression).Assembly.Location), "System.Linq.Expressions.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(Path.GetDirectoryName(typeof(Path).Assembly.Location), "System.IO.FileSystem.dll"))
             };
 
             //Use the right Microsoft Graph Version
@@ -71,8 +77,32 @@ namespace MsGraphSDKSnippetsCompiler
                references: metadataReferences,
                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            EmitResult emitResult = GetEmitResult(compilation);
+            var (emitResult, assembly) = GetEmitResult(compilation);
             CompilationResultsModel results = GetCompilationResults(emitResult);
+
+            if (results.IsCompilationSuccessful)
+            {
+                try
+                {
+                    var clientId = string.Empty;
+                    var tenantId = string.Empty;
+                    var clientSecret = string.Empty;
+                    dynamic instance = assembly.CreateInstance("GraphSDKTest");
+                    IConfidentialClientApplication confidentialClientApp = ConfidentialClientApplicationBuilder
+                        .Create(clientId)
+                        .WithTenantId(tenantId)
+                        .WithClientSecret(clientSecret)
+                        .Build();
+                    var authProvider = new ClientCredentialProvider(confidentialClientApp, "https://graph.microsoft.com/.default");
+                    var task = instance.Main(authProvider) as Task;
+                    task.Wait();
+                    results.IsRunSuccessful = true;
+                }
+                catch (AggregateException ae)
+                {
+                    results.ExceptionMessage = ae.InnerException.Message;
+                }
+            }
 
             return results;
         }
@@ -81,11 +111,19 @@ namespace MsGraphSDKSnippetsCompiler
         ///     Gets the result of the Compilation.Emit method.
         /// </summary>
         /// <param name="compilation">Immutable respresentation of a single invocation of the compiler</param>
-        private EmitResult GetEmitResult(CSharpCompilation compilation)
+        private (EmitResult, System.Reflection.Assembly) GetEmitResult(CSharpCompilation compilation)
         {
+            System.Reflection.Assembly assembly = null;
+
             using MemoryStream memoryStream = new MemoryStream();
             EmitResult emitResult = compilation.Emit(memoryStream);
-            return emitResult;
+
+            if (emitResult.Success)
+            {
+                memoryStream.Seek(0, SeekOrigin.Begin);
+                assembly = AssemblyLoadContext.Default.LoadFromStream(memoryStream);
+            }
+            return (emitResult, assembly);
         }
 
         /// <summary>
@@ -103,13 +141,13 @@ namespace MsGraphSDKSnippetsCompiler
                     diagnostic.IsWarningAsError ||
                     diagnostic.Severity == DiagnosticSeverity.Error);
 
-                compilationResultsModel.IsSuccess = false;
+                compilationResultsModel.IsCompilationSuccessful = false;
                 compilationResultsModel.Diagnostics = failures;
                 compilationResultsModel.MarkdownFileName = _markdownFileName;
             }
             else
             {
-                compilationResultsModel.IsSuccess = true;
+                compilationResultsModel.IsCompilationSuccessful = true;
                 compilationResultsModel.Diagnostics = null;             
                 compilationResultsModel.MarkdownFileName = _markdownFileName;
             }

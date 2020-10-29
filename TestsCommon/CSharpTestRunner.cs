@@ -32,12 +32,8 @@ using KeyValuePair = Microsoft.Graph.KeyValuePair;
 
 public class GraphSDKTest
 {
-    private IAuthenticationProvider authProvider = null;
-
-    private async void Main()
+    public async Task Main(IAuthenticationProvider authProvider)
     {
-        authProvider = AuthenticationProvider.GetIAuthenticationProvider();
-
         #region msgraphsnippets
         //insert-code-here
         #endregion
@@ -103,24 +99,28 @@ public class GraphSDKTest
 
             // Compile Code
             var microsoftGraphCSharpCompiler = new MicrosoftGraphCSharpCompiler(testData.FileName);
-            var compilationResultsModel = microsoftGraphCSharpCompiler.CompileSnippet(codeToCompile, testData.Version);
-
-            if (compilationResultsModel.IsSuccess)
-            {
-                Assert.Pass();
-            }
-
+            var compilationResultsModel = microsoftGraphCSharpCompiler.RunSnippet(codeToCompile, testData.Version);
             var compilationOutputMessage = new CompilationOutputMessage(compilationResultsModel, codeToCompile, testData.DocsLink, testData.KnownIssueMessage, testData.IsKnownIssue);
 
-            // environment variable for sources directory is defined only for cloud runs
-            var config = AppSettings.Config();
-            if (bool.Parse(config.GetSection("IsLocalRun").Value)
-                && bool.Parse(config.GetSection("GenerateLinqPadOutputInLocalRun").Value))
+            if (!compilationResultsModel.IsCompilationSuccessful)
             {
-                WriteLinqFile(testData, codeSnippetFormatted);
+                // environment variable for sources directory is defined only for cloud runs
+                var config = AppSettings.Config();
+                if (bool.Parse(config.GetSection("IsLocalRun").Value)
+                    && bool.Parse(config.GetSection("GenerateLinqPadOutputInLocalRun").Value))
+                {
+                    WriteLinqFile(testData, codeSnippetFormatted);
+                }
+
+                Assert.Fail($"{compilationOutputMessage}");
             }
 
-            Assert.Fail($"{compilationOutputMessage}");
+            if (!compilationResultsModel.IsRunSuccessful)
+            {
+                Assert.Fail($"{compilationOutputMessage}{Environment.NewLine}{compilationResultsModel.ExceptionMessage}");
+            }
+            
+            Assert.Pass(compilationOutputMessage.ToString());
         }
 
         /// <summary>

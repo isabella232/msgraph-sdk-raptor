@@ -5,8 +5,10 @@ namespace MsGraphSDKSnippetsCompiler.Models
 {
     public class CompilationResultsModel
     {
-        public bool IsSuccess { get; set; }
+        public bool IsCompilationSuccessful { get; set; }
         public IEnumerable<Diagnostic> Diagnostics { get; set; }
         public string MarkdownFileName { get; set; }
+        public string ExceptionMessage { get; set; }
+        public bool IsRunSuccessful { get; set; } = false;
     }
 }
