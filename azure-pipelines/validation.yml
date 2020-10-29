@@ -53,7 +53,7 @@ variables:
   runSettingsFile: '$(Build.SourcesDirectory)/msgraph-sdk-raptor/CSharpArbitraryDllTests/Test.runsettings'
 
 stages:
-- stage: Git checkout
+- stage: GitCheckout
   jobs:
     - job: checkout
       steps:
@@ -94,7 +94,7 @@ stages:
         fetchDepth: 1
         persistCredentials: true
 
-- stage: Snippet Generation
+- stage: SnippetGeneration
   jobs:
     - job: SnippetGeneration
       steps:
@@ -135,7 +135,7 @@ stages:
 
             & $apidoctorPath generate-snippets --ignore-warnings --path . --snippet-generator-path $snippetGeneratorPath --lang $(snippetLanguages) --git-path "C:\Program Files\Git\bin\git.exe"
 
-- stage: SDK Service Library Generation
+- stage: SDKServiceLibraryGeneration
   jobs:
     - job: Generation
       steps:
@@ -204,7 +204,7 @@ stages:
           projects: msgraph-sdk-dotnet/**/*.csproj
           arguments: '--configuration $(buildConfiguration)'
 
-- stage: Raptor Tests
+- stage: RaptorTests
   jobs:
     - job: PrepareTestSettings
       steps:
@@ -303,7 +303,7 @@ stages:
           testRunTitle: '[$(metadataVersion)] Raptor Known Failures [Metadata:$(metadataURL)]'
         displayName: 'Publish Test Results for Known Failures'
 
-- stage: Type Summary Generation
+- stage: TypeSummaryGeneration
   jobs:
     - job: TypeSummary
       steps:
