@@ -261,7 +261,7 @@ stages:
           testRunTitle: '[$(metadataVersion)] Raptor Regular Tests [Metadata:$(metadataURL)]'
         displayName: 'Publish Test Results for Regular Tests'
 
-    - job: PrepareTestSettings
+    - job: PrepareTestSettingsForKnownFailures
       condition: eq(variables['runKnownFailureTests'], true)
       steps:
       - task: PowerShell@2
